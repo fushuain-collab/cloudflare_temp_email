@@ -1,0 +1,28 @@
+name: Deploy Backend v5
+on:
+  workflow_dispatch:
+
+env:
+  INPUT_DB_UUID: d15a8696-757c-49f1-a176-248bf781bf98
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Install pnpm
+        run: npm install -g pnpm@10.10.0
+
+      - name: Install Wrangler
+        run: npm install -g wrangler@4.96.0
+
+      - name: Deploy Backend
+        run: chmod +x scripts/deploy_backend.sh && ./scripts/deploy_backend.sh
