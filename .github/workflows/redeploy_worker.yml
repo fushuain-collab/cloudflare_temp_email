@@ -1,6 +1,6 @@
 name: Redeploy Worker
 
-oo:
+on:
   workflow_dispatch:
   push:
     paths:
