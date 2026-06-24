@@ -4,7 +4,6 @@ on:
   push:
     tags:
       - "*"
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -25,15 +24,19 @@ jobs:
           cd worker
           npx wrangler d1 create temp_email_db 2>&1 || true
           npx wrangler d1 list --json > /tmp/d1.json
-          DB_UUID=$(python3 -c "import json;d=json.load(open('/tmp/d1.json'));[print(x['uuid']) for x in d if x['name']=='temp_email_db']" 2>/dev/null)
+          DB_UUID=$(python3 -c "import json;d=json.load(open("/tmp/d1.json"));[print(x["uuid"]) for x in d if x["name"]=="temp_email_db"]" 2>/dev/null)
           if [ -z "$DB_UUID" ]; then echo "FAIL: cannot get uuid"; exit 1; fi
-          echo "$WRANGLER_TOML_CONTENT" | python3 -c "
-import sys,re
-c=sys.stdin.read()
-u='$DB_UUID'
-c=re.sub(r'database_id\s*=\s*\"[^\"]*\"','database_id = \"'+u+'\"',c)
-sys.stdout.write(c)
-" > wrangler.toml
+          echo "$WRANGLER_TOML_CONTENT" > /tmp/wrangler_tmp.toml
+          cp /tmp/wrangler_tmp.toml wrangler.toml
+          python3 -c "
+import sys, re
+with open('wrangler.toml', 'r') as f:
+    c = f.read()
+u = '$DB_UUID'
+c = re.sub(r'database_id\s*=\s*\"[^\"]*\"', 'database_id = \"' + u + '\"', c)
+with open('wrangler.toml', 'w') as f:
+    f.write(c)
+"
           grep database_id wrangler.toml
           pnpm install --no-frozen-lockfile
           pnpm run deploy
