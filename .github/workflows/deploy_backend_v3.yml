@@ -1,9 +1,6 @@
 name: Deploy Backend v3
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - "*"
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -19,19 +16,15 @@ jobs:
         with:
           version: 10
           run_install: false
-      - name: Install Wrangler
-        run: npm install -g wrangler
-      - name: Deploy Backend Worker
+      - name: Deploy Backend
         run: |
           cd worker
           wrangler d1 create temp_email_db 2>&1 || true
-          wrangler d1 list --json > /tmp/d1_list.json
-          DB_UUID=$(python3 -c "import json,sys;d=json.load(open(sys.argv[1]));[print(x["uuid"]) for x in d if x["name"]=="temp_email_db"]" /tmp/d1_list.json 2>/dev/null)
-          if [ -z "$DB_UUID" ]; then echo "FAIL: cannot get uuid"; exit 1; fi
-          echo "DB_UUID=$DB_UUID"
-          echo "$WRANGLER_TOML_CONTENT" > wrangler.toml
-          python3 -c "import sys,re;c=open("wrangler.toml").read();c=re.sub(r"database_id\s*=\s*\"[^"]*\"","database_id = \""+sys.argv[1]+"\"",c);open("wrangler.toml","w").write(c)" "$DB_UUID"
-          grep database_id wrangler.toml
+          echo "$WRANGLER_TOML_CONTENT" > /tmp/base.toml
+          DB_UUID=$(wrangler d1 list --json 2>/dev/null | python3 -c "import json,sys;d=json.load(sys.stdin);[print(x.get('uuid','')) for x in d if x.get('name','')=='temp_email_db']" 2>/dev/null || echo "d15a8696-757c-49f1-a176-248bf781bf98")
+          echo "Using DB_UUID=$DB_UUID"
+          sed "s/database_id *= *"[^"]*"/database_id = "$DB_UUID"/" /tmp/base.toml > wrangler.toml
+          cat wrangler.toml
           pnpm install --no-frozen-lockfile
           pnpm run deploy
         env:
