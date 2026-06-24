@@ -56,17 +56,29 @@ jobs:
           echo "Checking/Creating D1 database temp_email_db..."
           # 尝试创建，如果已存在则忽略错误
           npx wrangler d1 create temp_email_db 2>&1 || true
-          # 获取真实UUID - 用wrangler d1 list --json解析
+          # 获取真实UUID - 用wrangler d1 list --json解析  
           echo "Getting D1 database UUID..."
-          DB_UUID=$(npx wrangler d1 list --json 2>/dev/null | python3 -c "import sys,json;dbs=json.load(sys.stdin);[print(d['uuid']) for d in dbs if d['name']=='temp_email_db']" 2>/dev/null || echo "")
+          DB_UUID=$(npx wrangler d1 list --json 2>/dev/null | python3 -c 'import sys,json;dbs=json.load(sys.stdin);[print(d["uuid"]) for d in dbs if d["name"]=="temp_email_db"]' 2>/dev/null || echo "")
           if [ -z "$DB_UUID" ]; then
             echo "ERROR: Failed to get UUID for D1 database temp_email_db"
             exit 1
           fi
           echo "Using D1 database UUID: $DB_UUID"
-          # 写入BACKEND_TOML内容到临时文件，替换database_id
-          printf '%s\n' "$WRANGLER_TOML_CONTENT" | sed "s/database_id\s*=\s*"[^"]*"/database_id = \"$DB_UUID\"/" > wrangler.toml
-          echo "Updated wrangler.toml with database_id = $DB_UUID"
+          # 写入BACKEND_TOML并替换database_id为真实UUID
+          # 使用python3完全在脚本内部替换，避免shell转义陷阱
+          python3 -c '
+import sys, json, os
+content = "$WRANGLER_TOML_CONTENT"
+uuid = os.environ.get("CF_D1_UUID", "")
+import re
+content = re.sub(r"database_id\s*=\s*"[^"]*"", "database_id = \"" + uuid + "\"", content)
+with open("wrangler.toml", "w") as f:
+    f.write(content)
+print("Updated wrangler.toml database_id to: " + uuid)
+' 2>&1
+          echo "wrangler.toml prepared for deployment"
+          # 验证uuid已写入
+          grep database_id wrangler.toml
           
           pnpm install --no-frozen-lockfile
 
@@ -94,3 +106,5 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           # ✅ 将 secret 映射到环境变量中
           WRANGLER_TOML_CONTENT: ${{ secrets.BACKEND_TOML }}
+          # ✅ 将D1 UUID通过环境变量传递给python脚本
+          CF_D1_UUID: ${{ steps.d1-uuid.outputs.uuid }}
