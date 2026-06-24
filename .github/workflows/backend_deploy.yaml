@@ -1,0 +1,43 @@
+name: Deploy Backend
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "*"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v5
+        name: Install pnpm
+        with:
+          version: 10
+          run_install: false
+      - name: Deploy Backend
+        run: |
+          cd worker
+          npx wrangler d1 create temp_email_db 2>&1 || true
+          npx wrangler d1 list --json > /tmp/d1.json
+          DB_UUID=$(python3 -c "import json;d=json.load(open('/tmp/d1.json'));[print(x['uuid']) for x in d if x['name']=='temp_email_db']" 2>/dev/null)
+          if [ -z "$DB_UUID" ]; then echo "FAIL: cannot get uuid"; exit 1; fi
+          echo "$WRANGLER_TOML_CONTENT" | python3 -c "
+import sys,re
+c=sys.stdin.read()
+u='$DB_UUID'
+c=re.sub(r'database_id\s*=\s*\"[^\"]*\"','database_id = \"'+u+'\"',c)
+sys.stdout.write(c)
+" > wrangler.toml
+          grep database_id wrangler.toml
+          pnpm install --no-frozen-lockfile
+          pnpm run deploy
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          WRANGLER_TOML_CONTENT: ${{ secrets.BACKEND_TOML }}
