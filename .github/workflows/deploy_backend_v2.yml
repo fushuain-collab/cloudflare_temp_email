@@ -21,17 +21,27 @@ jobs:
           run_install: false
       - name: Install Wrangler
         run: npm install -g wrangler
-      - name: Create D1 Database
+      - name: Deploy Backend Worker
         run: |
           cd worker
           wrangler d1 create temp_email_db 2>&1 || true
           wrangler d1 list --json > /tmp/d1_list.json
-          cat /tmp/d1_list.json
-      - name: Deploy Backend Worker
-        run: |
-          cd worker
+          DB_UUID=$(python3 -c "import json;d=json.load(open('/tmp/d1_list.json'));[print(x['uuid']) for x in d if x['name']=='temp_email_db']" 2>/dev/null)
+          if [ -z "$DB_UUID" ]; then echo "FAIL: cannot get uuid"; exit 1; fi
+          echo "DB_UUID=$DB_UUID"
+          echo "$WRANGLER_TOML_CONTENT" > wrangler.toml
+          python3 -c "
+import sys, re
+with open('wrangler.toml', 'r') as f:
+    c = f.read()
+c = re.sub(r'database_id\s*=\s*"[^"]*"', 'database_id = "' + '$DB_UUID' + '"', c)
+with open('wrangler.toml', 'w') as f:
+    f.write(c)
+"
+          grep database_id wrangler.toml
           pnpm install --no-frozen-lockfile
           pnpm run deploy
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          WRANGLER_TOML_CONTENT: ${{ secrets.BACKEND_TOML }}
