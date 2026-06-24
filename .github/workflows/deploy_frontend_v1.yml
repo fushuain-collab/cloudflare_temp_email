@@ -1,0 +1,31 @@
+name: Deploy Frontend v1
+
+on:
+  workflow_dispatch:
+
+env:
+  FRONTEND_NAME: ${{ secrets.FRONTEND_NAME }}
+  FRONTEND_ENV: ${{ secrets.FRONTEND_ENV }}
+
+jobs:
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Install pnpm
+        run: npm install -g pnpm@10.10.0
+
+      - name: Deploy Frontend
+        run: |
+          chmod +x scripts/deploy_frontend.sh
+          ./scripts/deploy_frontend.sh
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
