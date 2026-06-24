@@ -6,7 +6,8 @@ on:
     branches:
       - main
     paths:
-      - 'scripts/deploy_email_routing.sh'\
+      - 'scripts/deploy_email_routing.sh'
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
