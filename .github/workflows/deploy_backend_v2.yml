@@ -1,0 +1,37 @@
+name: Deploy Backend v2
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "*"
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v5
+        name: Install pnpm
+        with:
+          version: 10
+          run_install: false
+      - name: Install Wrangler
+        run: npm install -g wrangler
+      - name: Create D1 Database
+        run: |
+          cd worker
+          wrangler d1 create temp_email_db 2>&1 || true
+          wrangler d1 list --json > /tmp/d1_list.json
+          cat /tmp/d1_list.json
+      - name: Deploy Backend Worker
+        run: |
+          cd worker
+          pnpm install --no-frozen-lockfile
+          pnpm run deploy
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
