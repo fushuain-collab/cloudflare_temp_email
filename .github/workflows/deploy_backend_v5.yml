@@ -4,6 +4,7 @@ on:
 
 env:
   INPUT_DB_UUID: d15a8696-757c-49f1-a176-248bf781bf98
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
 jobs:
   deploy:
