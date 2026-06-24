@@ -52,8 +52,35 @@ jobs:
           export use_mail_wasm_parser=${{ secrets.BACKEND_USE_MAIL_WASM_PARSER }}
           
           cd worker/
-          # ✅ 修复核心：使用环境变量写入，避免 Shell 解析特殊字符
-          printf '%s\n' "$WRANGLER_TOML_CONTENT" > wrangler.toml
+          # 自动创建D1数据库（如果不存在）
+          echo "Checking/Creating D1 database temp_email_db..."
+          DB_INFO=$(npx wrangler d1 create temp_email_db 2>&1 || true)
+          echo "$DB_INFO"
+          # 从输出中提取database_id(UUID)
+          DB_UUID=$(echo "$DB_INFO" | grep -oP '"database_id":\s*"\K[a-f0-9-]+' || echo "")
+          if [ -z "$DB_UUID" ]; then
+            # 尝试用list方式获取已存在的db uuid
+            DB_UUID=$(npx wrangler d1 list --json 2>/dev/null | python3 -c "import sys,json; dbs=json.load(sys.stdin); [print(d['uuid']) for d in dbs if d['name']=='temp_email_db']" || echo "")
+          fi
+          if [ -z "$DB_UUID" ]; then
+            echo "ERROR: Could not find or create D1 database temp_email_db"
+            exit 1
+          fi
+          echo "Using D1 database UUID: $DB_UUID"
+          # 替换wrangler.toml中的占位符
+          # 先写入BACKEND_TOML内容
+          printf '%s\n' "$WRANGLER_TOML_CONTENT" > wrangler.toml.orig
+          # 替换 database_id 为真实UUID（兼容"xxx"或"temp_email_db"等占位符）
+          python3 -c "
+import re, sys
+with open('wrangler.toml.orig', 'r') as f:
+    content = f.read()
+# 替换 database_id = "xxx" 或 database_id = "temp_email_db" 为真实UUID
+content = re.sub(r'(database_id\s*=\s*)"[^"]+"', r'\1"$DB_UUID"', content)
+with open('wrangler.toml', 'w') as f:
+    f.write(content)
+print('Updated wrangler.toml database_id')
+" 
           
           pnpm install --no-frozen-lockfile
 
