@@ -1,8 +1,6 @@
 name: Redeploy Worker
 
-keys: deploy
-
-on:
+oo:
   workflow_dispatch:
   push:
     paths:
@@ -18,5 +16,5 @@ jobs:
           node-version: 20
       - name: Deploy Worker
         run: |
-          chmod +8 scripts/redeploy_worker.sh
+          chmod +x scripts/redeploy_worker.sh
           CLOUDFLARE_API_TOKEN=${{ secrets.CLOUDFLARE_API_TOKEN }} CLOUDFLARE_ACCOUNT_ID=${{ secrets.CLOUDFLARE_ACCOUNT_ID }} ./scripts/redeploy_worker.sh
